@@ -1,43 +1,73 @@
+# Image Analyst App
 
-# Image Analyst App (Gemini 3.0 Imaginator)
+画像をアップロードしてGemini AIで解析し、詳細なプロンプト情報の抽出、ポーズ生成、そしてNotionデータベースへの自動保存を行うWebアプリケーションです。
 
-画像をアップロードして分析し、画像生成AI（Stable DiffusionやMidjourneyなど）で使用可能な詳細なプロンプト（JSON形式）と、構図やキャラクターデザインの参考となるビジュアルガイドを生成するアプリケーションです。
+## 🚀 主な機能
 
-Google Gemini API (Gemini 2.5 Flash / Gemini 2.5 Flash Image) を活用しています。
+- **画像分析 (Image Analysis)**
+  - Gemini 2.5 Flash を使用して画像を解析。
+  - 被写体、服装、背景、ライティングなどを詳細なJSONデータとして抽出。
+  - 「日本人女性 ("Japanese woman")」などの特定キーワードを含めたプロンプト生成。
 
-## 主な機能
+- **ポーズ抽出 (Pose Extraction)**
+  - 画像内の人物ポーズを解析し、線画（Line Art）スタイルの参照画像を生成。
+  - イラスト制作や資料として活用可能。
 
-1.  **画像分析 (Image Analysis)**
-    *   アップロードされた画像を解析し、キャラクターのアイデンティティ、視覚スタイル、顔の特徴、服装、背景情報を詳細なJSONデータとして抽出します。
-    *   全要素を統合した「Full Prompt」も生成されます。
+- **Notion連携 (Save to Notion)**
+  - 解析結果（JSONデータ）と元画像をワンクリックでNotionに保存。
+  - 画像はGoogle Driveに保存され、その公開リンクがNotionに埋め込まれます。
 
-2.  **ポーズ線画生成 (Pose Line Art)**
-    *   元画像の構図とポーズを忠実に再現した、シンプルな線画（白黒）を生成します。
-    *   ControlNetなどの参照画像として使用することを想定しています。
-    *   顔の詳細はあえて少し抽象化し、構図としての使いやすさを重視しています。
+## 🛠 システムアーキテクチャ
 
-3.  **正面顔ガイド生成 (Frontal Face Visual Guide)**
-    *   元画像が横顔や斜めであっても、キャラクターの顔を「正面向き（Frontal View）」に変換した線画を生成します。
-    *   キャラクターデザイン（三面図など）の作成や、LoRA学習用のデータセット作成支援に役立ちます。
+データ処理のフローは以下の通りです：
 
-4.  **顔専用プロンプト生成 (Frontal Face JSON)**
-    *   「正面顔ガイド」に対応する、顔の特徴（目、髪型、表情など）に特化した詳細なJSONプロンプトを生成します。
+```mermaid
+graph LR
+    A[React App] -- 1. JSON + 画像データ --> B(Google Apps Script)
+    B -- 2. 画像ファイル保存 --> C[Google Drive]
+    C -- 3. 公開リンク発行 --> B
+    B -- 4. テキスト + 画像リンク --> D[Notion Database]
+```
 
-5.  **Notion保存連携**
-    *   Google Apps Script (GAS) を経由して、解析結果や生成された画像をNotionデータベース等に保存する機能があります。
+## 💻 セットアップと実行
 
-## 使用しているモデル
+### 前提条件
 
-*   **gemini-2.5-flash**: 高速なマルチモーダル理解による画像のテキスト解析（JSON生成）。
-*   **gemini-2.5-flash-image**: 画像入力から新しい画像を生成（ポーズ線画、正面顔線画の生成）。
+- **Node.js**: 実行環境
+- **Gemini API Key**: Google AI Studioで取得
+- **Google Apps Script (GAS)**: デプロイ済みのスクリプト（Notion/Drive連携用）
 
-## セットアップ
+### インストール手順
 
-1.  プロジェクトのルートで依存関係をインストールし、開発サーバーを起動してください。
-2.  `App.tsx` 内の `GAS_API_URL` 定数に、デプロイしたGoogle Apps ScriptのWebアプリURLを設定してください（保存機能を使用する場合）。
-3.  Gemini APIキーが必要です（初回起動時に設定ダイアログ、または環境変数）。
+1.  **インストール**
+    依存関係をインストールします。
 
-## 開発メモ
+    ```bash
+    npm install
+    ```
 
-*   **スタイルの統一**: すべての文字列値は日本語で出力されるようにプロンプトエンジニアリングされています。
-*   **レイアウト**: 3カラム構成（ソース画像 / 全体分析 / ビジュアルガイド＆顔分析）で、作業効率を高めています。
+2.  **環境変数の設定**
+    ルートディレクトリに `.env` または `.env.local` ファイルを作成し、GeminiのAPIキーを設定します。
+
+    ```env
+    GEMINI_API_KEY=your_gemini_api_key_here
+    ```
+
+3.  **GASエンドポイントの設定**
+    ルートディレクトリにある `App.tsx` ファイルを開き、`GAS_API_URL` 定数の値をデプロイしたGoogle Apps ScriptのURLに変更してください。
+
+4.  **アプリケーションの起動**
+    開発サーバーを立ち上げます。
+
+    ```bash
+    npm run dev
+    ```
+
+## 📦 技術スタック
+
+- **Frontend**: React, Vite, TypeScript
+- **Styling**: Tailwind CSS
+- **AI Models**:
+  - `gemini-2.5-flash` (解析用)
+  - `gemini-2.5-flash-image` (画像生成用)
+- **Integration**: Google Apps Script (GAS), Google Drive, Notion API
