@@ -1,20 +1,83 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+プロジェクトの全体像とアーキテクチャ図のご共有ありがとうございます。ReactからGASを経由してDriveとNotionへ連携するフローが明確になり、非常に強力な構成ですね。
 
-# Run and deploy your AI Studio app
+ご提示いただいた設計図と現在の実装内容（Gemini 2.5 Flashによる解析機能、Notion保存機能の実装など）を反映させた、新しい `README.md` を作成しました。
 
-This contains everything you need to run your app locally.
+以下のコードブロック右上の「Copy」ボタンで内容をコピーして、`README.md` に貼り付けてください。
 
-View your app in AI Studio: https://ai.studio/apps/drive/1PFj3lqBw9TOQBprOub6EnTDdIeH3NUQT
+````markdown
+# Image Analyst App
 
-## Run Locally
+画像をアップロードしてGemini AIで解析し、詳細なプロンプト情報の抽出、ポーズ生成、そしてNotionデータベースへの自動保存を行うWebアプリケーションです。
 
-**Prerequisites:**  Node.js
+## 🚀 主な機能
 
+1. **画像分析 (Image Analysis)**
+   - Gemini 2.5 Flash を使用して画像を解析。
+   - 被写体、服装、背景、ライティングなどを詳細なJSONデータとして抽出。
+   - 日本人女性 ("Japanese woman") などの特定のキーワードを含めたプロンプト生成。
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+2. **ポーズ抽出 (Pose Extraction)**
+   - 画像内の人物ポーズを解析し、線画（Line Art）スタイルの参照画像を生成。
+   - 絵を描く際の資料として活用可能。
+
+3. **Notion連携 (Save to Notion)**
+   - 解析結果（JSONデータ）と元画像をワンクリックでNotionに保存。
+   - 画像はGoogle Driveに保存され、そのリンクがNotionに埋め込まれます。
+
+## 🛠 システムアーキテクチャ
+
+このプロジェクトは以下のフローでデータを処理します：
+
+```mermaid
+graph LR
+    A[React App] -- 1. JSON + 画像データ --> B(Google Apps Script)
+    B -- 2. 画像ファイル保存 --> C[Google Drive]
+    C -- 3. 公開リンク発行 --> B
+    B -- 4. テキスト + 画像リンク --> D[Notion Database]
+````
+
+## 💻 ローカルでの実行方法
+
+### 前提条件
+
+  - Node.js
+  - Google AI Studio (Gemini API) の APIキー
+  - (連携用) デプロイ済みの Google Apps Script
+
+### 手順
+
+1.  **依存関係のインストール**
+
+    ```bash
+    npm install
+    ```
+
+2.  **環境変数の設定**
+    ルートディレクトリに `.env.local` ファイルを作成し、Gemini APIキーを設定します。
+
+    ```env
+    GEMINI_API_KEY=your_gemini_api_key_here
+    ```
+
+3.  **GASエンドポイントの設定**
+    `App.tsx` 内の `GAS_API_URL` 定数を、デプロイしたGoogle Apps ScriptのウェブアプリURLに設定してください。
+
+4.  **開発サーバーの起動**
+
+    ```bash
+    npm run dev
+    ```
+
+## 📦 技術スタック
+
+  - **Frontend**: React, Vite, TypeScript
+  - **Styling**: Tailwind CSS
+  - **AI Models**:
+      - `gemini-2.5-flash` (Text/Vision Analysis)
+      - `gemini-2.5-flash-image` (Image Generation)
+  - **Integration**: Google Apps Script (GAS), Google Drive, Notion API
+
+<!-- end list -->
+
+```
+```
