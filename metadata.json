@@ -1,0 +1,5 @@
+{
+  "name": "Image Analyst App",
+  "description": "Upload an image to analyze and extract details in JSON format using Gemini 2.5 Flash.",
+  "requestFramePermissions": []
+}
