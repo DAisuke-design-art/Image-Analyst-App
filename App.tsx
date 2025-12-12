@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   const [poseState, setPoseState] = useState<AppState>(AppState.IDLE);
-  const [poseImage, setPoseImage] = useState<string | null>(null);
+  const [poseImages, setPoseImages] = useState<{detailed: string | null, abstract: string | null}>({detailed: null, abstract: null});
   const [poseError, setPoseError] = useState<string | null>(null);
 
   // Notion state
@@ -48,7 +48,7 @@ const App: React.FC = () => {
   const handleImageSelect = async (base64: string) => {
     // 1. Reset all states
     setPromptData(null);
-    setPoseImage(null);
+    setPoseImages({detailed: null, abstract: null});
     setJsonError(null);
     setPoseError(null);
     setJsonState(AppState.IDLE);
@@ -80,8 +80,13 @@ const App: React.FC = () => {
   const runPoseGeneration = async (image: string, aspectRatio: string) => {
     setPoseState(AppState.ANALYZING);
     try {
-      const resultImage = await generatePoseImage(image, aspectRatio);
-      setPoseImage(resultImage);
+      // Run both generations in parallel
+      const [detailed, abstract] = await Promise.all([
+        generatePoseImage(image, aspectRatio, 'detailed'),
+        generatePoseImage(image, aspectRatio, 'abstract')
+      ]);
+
+      setPoseImages({ detailed, abstract });
       setPoseState(AppState.REVIEW);
     } catch (err) {
       console.error(err);
@@ -127,7 +132,7 @@ const App: React.FC = () => {
   const reset = () => {
     setUploadedImage(null);
     setPromptData(null);
-    setPoseImage(null);
+    setPoseImages({detailed: null, abstract: null});
     setJsonState(AppState.IDLE);
     setPoseState(AppState.IDLE);
     setJsonError(null);
@@ -136,8 +141,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md sticky top-0 z-10">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col h-screen overflow-hidden">
+      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md sticky top-0 z-10 shrink-0">
         <div className="max-w-[1800px] mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white">
@@ -182,23 +187,23 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-[1800px] mx-auto w-full p-4 md:p-6 lg:p-8 flex flex-col gap-6">
+      <main className="flex-1 max-w-[1800px] mx-auto w-full p-4 md:p-6 lg:p-8 flex flex-col gap-6 overflow-hidden">
         {/* 3-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full min-h-[600px]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             
             {/* Col 1: Source Image */}
-            <div className="flex flex-col gap-4">
-                <h2 className="text-lg font-semibold text-gray-300 flex items-center gap-2">
+            <div className="flex flex-col gap-4 h-full min-h-0">
+                <h2 className="text-lg font-semibold text-gray-300 flex items-center gap-2 shrink-0">
                     <span className="w-6 h-6 rounded-full bg-gray-800 text-xs flex items-center justify-center border border-gray-700">1</span>
                     Source
                 </h2>
 
                 {!uploadedImage ? (
-                    <div className="h-64 lg:h-auto lg:flex-1">
+                    <div className="h-full">
                         <ImageUploader onImageSelected={handleImageSelect} />
                     </div>
                 ) : (
-                    <div className="relative group rounded-xl overflow-hidden border border-gray-800 bg-gray-900 w-full flex-1 flex items-start justify-center min-h-[300px] p-4">
+                    <div className="relative group rounded-xl overflow-hidden border border-gray-800 bg-gray-900 w-full flex-1 flex items-start justify-center p-4">
                         <img src={uploadedImage} alt="Source" className="max-w-full max-h-full object-contain" />
                         <button 
                             onClick={reset} 
@@ -212,13 +217,13 @@ const App: React.FC = () => {
             </div>
 
             {/* Col 2: JSON Analysis */}
-            <div className="flex flex-col gap-4">
-                 <h2 className="text-lg font-semibold text-gray-300 flex items-center gap-2">
+            <div className="flex flex-col gap-4 h-full min-h-0">
+                 <h2 className="text-lg font-semibold text-gray-300 flex items-center gap-2 shrink-0">
                     <span className="w-6 h-6 rounded-full bg-gray-800 text-xs flex items-center justify-center border border-gray-700">2</span>
                     Analysis
                 </h2>
                 
-                <div className="flex-1 flex flex-col min-h-[400px]">
+                <div className="flex-1 flex flex-col overflow-hidden">
                     {jsonError ? (
                         <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-lg flex items-center gap-3">
                             <X className="w-5 h-5 flex-shrink-0" />
@@ -240,26 +245,44 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* Col 3: Visual Generation (Pose Only) */}
-            <div className="flex flex-col gap-4">
-                <h2 className="text-lg font-semibold text-gray-300 flex items-center gap-2">
+            {/* Col 3: Visual Generation (Pose Only) - Split View */}
+            <div className="flex flex-col gap-4 h-full min-h-0">
+                <h2 className="text-lg font-semibold text-gray-300 flex items-center gap-2 shrink-0">
                     <span className="w-6 h-6 rounded-full bg-gray-800 text-xs flex items-center justify-center border border-gray-700">3</span>
                     Pose Line Art
                 </h2>
                 
-                <div className="flex-1 flex flex-col min-h-[400px]">
+                {/* Container for Split View */}
+                <div className="flex-1 flex flex-col gap-4 min-h-0">
                     {poseError ? (
-                        <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-lg flex items-center gap-3">
+                        <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-lg flex items-center gap-3 shrink-0">
                             <X className="w-5 h-5 flex-shrink-0" />
                             <p>{poseError}</p>
                         </div>
                     ) : poseState === AppState.ANALYZING ? (
                         <div className="flex-1 rounded-xl border border-gray-800 bg-gray-900/50 flex flex-col items-center justify-center text-center p-8">
                              <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-                             <p className="text-gray-400">Generating pose sketch...</p>
+                             <p className="text-gray-400">Generating pose sketches...</p>
                         </div>
-                    ) : poseImage ? (
-                        <PoseDisplay imageUrl={poseImage} title="Pose Line Art" />
+                    ) : (poseImages.detailed || poseImages.abstract) ? (
+                        <>
+                            {/* Top Half: Detailed */}
+                            {poseImages.detailed && (
+                                <PoseDisplay 
+                                    imageUrl={poseImages.detailed} 
+                                    title="Detailed Pose (Character)" 
+                                    className="flex-1 min-h-0"
+                                />
+                            )}
+                            {/* Bottom Half: Abstract */}
+                            {poseImages.abstract && (
+                                <PoseDisplay 
+                                    imageUrl={poseImages.abstract} 
+                                    title="Abstract Pose (Mannequin)" 
+                                    className="flex-1 min-h-0"
+                                />
+                            )}
+                        </>
                     ) : (
                          <div className="flex-1 rounded-xl border-2 border-dashed border-gray-800 bg-gray-900/30 flex flex-col items-center justify-center text-center p-8 text-gray-600">
                             <ImageIcon className="w-12 h-12 mb-4 text-gray-700" />

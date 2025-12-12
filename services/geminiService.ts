@@ -281,7 +281,7 @@ export const analyzeFaceToJSON = async (base64Image: string): Promise<FacePrompt
  * Generates a simple line art drawing of the pose from the input image.
  * Uses gemini-2.5-flash-image for image-to-image generation.
  */
-export const generatePoseImage = async (base64Image: string, aspectRatio: string = "1:1"): Promise<string> => {
+export const generatePoseImage = async (base64Image: string, aspectRatio: string = "1:1", style: 'detailed' | 'abstract' = 'detailed'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const imagePart = {
@@ -290,6 +290,20 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
       data: stripBase64Header(base64Image),
     },
   };
+
+  let specificRequirements = "";
+  if (style === 'detailed') {
+    specificRequirements = `
+    - **IMPORTANT: DRAW THE FACE.** Clearly include eyes, eyebrows, nose, and mouth, but **simplify them slightly**. Do not be hyper-realistic; use a **slightly abstract, artistic touch** for the facial features while keeping the expression clear.
+    `;
+  } else {
+    specificRequirements = `
+    - **IMPORTANT: ABSTRACT FACE.** Do NOT draw detailed eyes, nose, lips, or expression.
+    - Draw the head as a simple shape (oval) with NO features.
+    - You MAY add a "cross" line (vertical and horizontal center lines) to indicate the face orientation/angle, like a drawing mannequin or wireframe.
+    - Focus strictly on the geometry of the pose.
+    `;
+  }
 
   const promptText = `
     Create a simple line drawing representing the subject in this image.
@@ -302,8 +316,8 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
     
     CONTENT REQUIREMENTS:
     - Faithfully reproduce the exact pose and body proportions of the subject.
-    - **IMPORTANT: DRAW THE FACE.** Clearly include eyes, eyebrows, nose, and mouth, but **simplify them slightly**. Do not be hyper-realistic; use a **slightly abstract, artistic touch** for the facial features while keeping the expression clear.
     - Do not include complex clothing patterns or background details. Focus on the character's form.
+    ${specificRequirements}
   `;
 
   const response = await ai.models.generateContent({
