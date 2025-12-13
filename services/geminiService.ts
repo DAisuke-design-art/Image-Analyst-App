@@ -23,7 +23,7 @@ const getMimeType = (base64: string) => {
  * Analyzes an image to generate a structured JSON prompt.
  * Uses gemini-2.5-flash for speed and vision capabilities.
  */
-export const analyzeImageToJSON = async (base64Image: string): Promise<PromptData> => {
+export const analyzeImageToJSON = async (base64Image: string, instructions: string = ""): Promise<PromptData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const responseSchema = {
@@ -33,10 +33,11 @@ export const analyzeImageToJSON = async (base64Image: string): Promise<PromptDat
         type: Type.OBJECT,
         properties: {
           Age_Gender: { type: Type.STRING },
+          Beauty_Characteristics: { type: Type.STRING, description: "Adjectives describing beauty/atmosphere (e.g. Seiso, Elegant, Translucent)" },
           Ethnicity: { type: Type.STRING },
           Body_Type: { type: Type.STRING },
         },
-        required: ["Age_Gender", "Ethnicity", "Body_Type"]
+        required: ["Age_Gender", "Beauty_Characteristics", "Ethnicity", "Body_Type"]
       },
       VISUAL_STYLE: {
         type: Type.OBJECT,
@@ -118,10 +119,31 @@ export const analyzeImageToJSON = async (base64Image: string): Promise<PromptDat
     
     Output ALL string values in **JAPANESE**.
 
+    **IMPORTANT: USER OVERRIDES**
+    The user has provided the following specific instructions/modifications:
+    "${instructions}"
+
+    **GUIDELINE 1: SUBJECT AESTHETICS (THE "BEAUTY FILTER")**
+    - **Target**: The person/character in the image.
+    - **Action**: Apply **Japanese Beauty Standards** to the description of the person. Even for older subjects, emphasize "Elegance", "Refinement", "Translucency", and "Beauty" rather than aging signs.
+    - **Keywords for 'Beauty_Characteristics'**: 清純な, 清楚な, 上品な, 儚げな, 透明感のある, 爽やかな, 愛らしい, 洗練された.
+
+    **GUIDELINE 2: SCENE & DETAILS (THE "REALITY FILTER")**
+    - **Target**: Background, Props, Accessories, Logos, Text.
+    - **Action**: Be **EXTREMELY SPECIFIC** and **FACTUAL**. Do NOT apply the beauty filter here.
+    - **Requirement**: If you see specific objects (e.g., a Starbucks cup, a smartphone model, specific car brand), logos, text on signs, or recognizable locations, **YOU MUST DESCRIBE THEM**.
+    - **Example**: Instead of "a cafe", say "a Starbucks-style cafe with a visible green logo cup". Instead of "a city", say "a busy Shibuya crossing street".
+
+    **INSTRUCTION PRIORITY:**
+    1. User instructions (highest).
+    2. Specific Scene Details (brands, logos, locations).
+    3. Subject Beauty Enhancement.
+
     Please structure the analysis into these categories:
 
     1. **CORE_IDENTITY**:
-       - Age_Gender (e.g., 20代前半の日本人女性)
+       - Age_Gender (e.g., 20代前半の日本人女性, 40代の日本人女性)
+       - Beauty_Characteristics (Select appropriate beauty adjectives from the list above)
        - Ethnicity
        - Body_Type
 
@@ -145,7 +167,7 @@ export const analyzeImageToJSON = async (base64Image: string): Promise<PromptDat
        - Bangs
 
     5. **BODY_FEATURES**:
-       - Skin (Texture quality)
+       - Skin (Texture quality - Emphasize 'smooth', 'radiant', 'clear')
        - Chest (Clothing fit/shape)
        - Hands_Limbs
 
@@ -154,13 +176,13 @@ export const analyzeImageToJSON = async (base64Image: string): Promise<PromptDat
        - Accessories
 
     7. **SCENE**:
-       - Environment
+       - Environment (**Be specific about location, logos, brands if visible**)
        - Lighting
        - Camera (Angle/Shot)
        - Orientation
        - Aspect_Ratio
 
-    Finally, generate 'fullPrompt': A comprehensive narrative description in Japanese combining all these elements.
+    Finally, generate 'fullPrompt': A coherent narrative merging the **Beautiful Subject** with the **Detailed/Specific Environment**.
   `;
 
   const response = await ai.models.generateContent({
@@ -281,33 +303,74 @@ export const analyzeFaceToJSON = async (base64Image: string): Promise<FacePrompt
  * Generates a simple line art drawing of the pose from the input image.
  * Uses gemini-2.5-flash-image for image-to-image generation.
  */
-export const generatePoseImage = async (base64Image: string, aspectRatio: string = "1:1", style: 'detailed' | 'abstract' = 'detailed'): Promise<string> => {
+export const generatePoseImage = async (base64Image: string, aspectRatio: string = "1:1", style: 'detailed' | 'abstract' = 'detailed', instructions: string = "", faceImage?: string | null): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const imagePart = {
+  // Main pose image
+  const poseImagePart = {
     inlineData: {
       mimeType: getMimeType(base64Image),
       data: stripBase64Header(base64Image),
     },
   };
 
+  const parts: any[] = [];
+  
+  let faceSwapInstruction = "";
+  
+  if (faceImage) {
+    // Face Reference image
+    const faceImagePart = {
+      inlineData: {
+        mimeType: getMimeType(faceImage),
+        data: stripBase64Header(faceImage),
+      },
+    };
+    
+    // IMPORTANT: Providing both images to the model
+    parts.push(poseImagePart);
+    parts.push({ text: "The FIRST image (above) is the POSE REFERENCE." });
+    parts.push(faceImagePart);
+    parts.push({ text: "The SECOND image (above) is the FACE REFERENCE (IDENTITY)." });
+    
+    faceSwapInstruction = `
+    **CRITICAL FACIAL IDENTITY REPLACEMENT:**
+    - You MUST replace the face of the subject in the Pose Reference with the face of the person in the Face Reference.
+    - **Maintain the POSE from Image 1.**
+    - **Use the FACIAL FEATURES (Eyes, Nose, Mouth, Likeness) from Image 2.**
+    - The face should look realistically like the person in Image 2, even within the line art style.
+    `;
+  } else {
+    parts.push(poseImagePart);
+    parts.push({ text: "Use this image as the reference." });
+  }
+
   let specificRequirements = "";
   if (style === 'detailed') {
     specificRequirements = `
-    - **IMPORTANT: DRAW THE FACE.** Clearly include eyes, eyebrows, nose, and mouth, but **simplify them slightly**. Do not be hyper-realistic; use a **slightly abstract, artistic touch** for the facial features while keeping the expression clear.
+    - **IMPORTANT: DRAW THE FACE.** Clearly include eyes, eyebrows, nose, and mouth.
+    - **REALISM LEVEL**: High. Create a detailed sketch that captures the likeness of the character.
+    - Do not be hyper-realistic shading-wise, but the features must be distinct and recognizable.
     `;
   } else {
     specificRequirements = `
-    - **IMPORTANT: ABSTRACT FACE.** Do NOT draw detailed eyes, nose, lips, or expression.
-    - Draw the head as a simple shape (oval) with NO features.
-    - You MAY add a "cross" line (vertical and horizontal center lines) to indicate the face orientation/angle, like a drawing mannequin or wireframe.
-    - Focus strictly on the geometry of the pose.
+    - **IMPORTANT: DETAILED MANNEQUIN FACE.**
+    - Do NOT make the face blank. Do NOT make it hyper-realistic.
+    - **MANDATORY**: You MUST draw clear **eyes with pupils** (to show gaze direction), a **nose line** (to show head angle), and a **mouth line**.
+    - The face should look like a high-quality drawing doll or a structural sketch.
+    - **GOAL**: Ensure the **direction of the eyes** and **tilt of the head** are perfectly readable by AI pose estimation tools.
+    - Use clean, geometric lines. No shading, no skin texture, no makeup details. Just the structural features.
     `;
   }
 
   const promptText = `
-    Create a simple line drawing representing the subject in this image.
+    Create a simple line drawing/sketch representing the subject.
+
+    **USER MODIFICATIONS (MANDATORY):**
+    The user wants to modify the subject as follows: "${instructions}".
     
+    ${faceSwapInstruction}
+
     STYLE GUIDELINES:
     - Black lines on a pure white background.
     - Minimalist, clean sketch style.
@@ -315,18 +378,17 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
     - High contrast (Black & White only).
     
     CONTENT REQUIREMENTS:
-    - Faithfully reproduce the exact pose and body proportions of the subject.
-    - Do not include complex clothing patterns or background details. Focus on the character's form.
+    - Faithfully reproduce the pose, angle, and body proportions of the POSE REFERENCE.
+    - Do not include complex clothing patterns or background details unless requested. Focus on the character's form.
     ${specificRequirements}
   `;
+
+  parts.push({ text: promptText });
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
     contents: {
-      parts: [
-        imagePart,
-        { text: promptText }
-      ]
+      parts: parts
     },
     config: {
       imageConfig: {

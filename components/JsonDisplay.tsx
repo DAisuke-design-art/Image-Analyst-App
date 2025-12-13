@@ -10,6 +10,14 @@ interface JsonDisplayProps {
 const JsonDisplay: React.FC<JsonDisplayProps> = ({ data }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  const { fullPrompt, ...structureData } = data;
+  
+  // Extract Aspect Ratio and create the display text
+  const aspectRatio = structureData.SCENE?.Aspect_Ratio;
+  const textToDisplay = aspectRatio 
+    ? `${fullPrompt}\n\n--ar ${aspectRatio}` 
+    : fullPrompt;
+
   const copyToClipboard = async (text: string, fieldId: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -18,16 +26,6 @@ const JsonDisplay: React.FC<JsonDisplayProps> = ({ data }) => {
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
-  };
-
-  const { fullPrompt, ...structureData } = data;
-
-  // Medium Prompt: Extract specific fields from the structure data
-  const mediumPromptData = {
-    CORE_IDENTITY: data.CORE_IDENTITY,
-    VISUAL_STYLE: data.VISUAL_STYLE,
-    FACE_FEATURES: data.FACE_FEATURES,
-    HAIR_STYLE: data.HAIR_STYLE,
   };
 
   return (
@@ -58,21 +56,21 @@ const JsonDisplay: React.FC<JsonDisplayProps> = ({ data }) => {
                 </pre>
             </div>
 
-            {/* Medium Prompt Block (Subset of JSON) */}
+            {/* Full Prompt Block (Text) - Replaces Medium Prompt */}
             <div className="relative group">
                 <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs text-indigo-400 uppercase font-bold tracking-wider">Medium Prompt (Character Focus)</label>
+                    <label className="text-xs text-indigo-400 uppercase font-bold tracking-wider">Full Prompt (Narrative)</label>
                     <button 
-                        onClick={() => copyToClipboard(JSON.stringify(mediumPromptData, null, 2), 'mediumPrompt')}
+                        onClick={() => copyToClipboard(textToDisplay, 'fullPrompt')}
                         className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
                     >
-                        {copiedField === 'mediumPrompt' ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copiedField === 'mediumPrompt' ? 'Copied' : 'Copy JSON'}
+                        {copiedField === 'fullPrompt' ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedField === 'fullPrompt' ? 'Copied' : 'Copy Text'}
                     </button>
                 </div>
-                <pre className="text-xs text-blue-300 font-mono bg-gray-950 p-4 rounded-lg overflow-x-auto border border-gray-800">
-                    {JSON.stringify(mediumPromptData, null, 2)}
-                </pre>
+                <div className="text-sm text-blue-200 bg-gray-950 p-4 rounded-lg border border-gray-800 whitespace-pre-wrap leading-relaxed">
+                    {textToDisplay}
+                </div>
             </div>
         </div>
       </div>

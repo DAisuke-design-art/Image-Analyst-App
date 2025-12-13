@@ -1,6 +1,7 @@
 
 export interface CoreIdentity {
   Age_Gender: string;
+  Beauty_Characteristics: string;
   Ethnicity: string;
   Body_Type: string;
 }
