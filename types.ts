@@ -1,6 +1,6 @@
-
 export interface CoreIdentity {
   Age_Gender: string;
+  Beauty_Characteristics: string;
   Ethnicity: string;
   Body_Type: string;
 }
@@ -9,6 +9,13 @@ export interface VisualStyle {
   Archetype: string;
   Vibe: string;
   Artistic_Style: string;
+}
+
+export interface EmotionalProfile {
+  Emotion: string;
+  Mood: string;
+  Expression: string;
+  Avoid: string;
 }
 
 export interface FaceFeatures {
@@ -46,19 +53,21 @@ export interface Scene {
   Aspect_Ratio: string;
 }
 
-// QualitySettings removed
-
 export interface PromptData {
   CORE_IDENTITY: CoreIdentity;
   VISUAL_STYLE: VisualStyle;
+  EMOTIONAL_PROFILE: EmotionalProfile;
   FACE_FEATURES: FaceFeatures;
   HAIR_STYLE: HairStyle;
   BODY_FEATURES: BodyFeatures;
   FASHION: Fashion;
   SCENE: Scene;
-  // QUALITY_SETTINGS removed
-
   fullPrompt: string;
+}
+
+export interface DualLanguagePromptData {
+  japanese: PromptData;
+  english: PromptData;
 }
 
 export interface FaceCoreIdentity {
@@ -66,16 +75,11 @@ export interface FaceCoreIdentity {
   Ethnicity: string;
 }
 
-export interface ExpressionVibe {
-  Mood: string;
-  Gaze: string;
-}
-
 export interface FacePromptData {
   CORE_IDENTITY: FaceCoreIdentity;
+  EMOTIONAL_PROFILE: EmotionalProfile;
   FACE_FEATURES: FaceFeatures;
   HAIR_STYLE: HairStyle;
-  EXPRESSION_VIBE: ExpressionVibe;
   fullPrompt: string;
 }
 
