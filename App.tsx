@@ -4,7 +4,7 @@ import { analyzeImageToJSON, generatePoseImage } from './services/geminiService'
 import ImageUploader from './components/ImageUploader';
 import JsonDisplay from './components/JsonDisplay';
 import PoseDisplay from './components/PoseDisplay';
-import { PromptData, AppState } from './types';
+import { DualLanguagePromptData, AppState } from './types';
 import { Loader2, X, Code2, ImageIcon, FileJson, Save, CheckCircle, Wand2, MessageSquare, UserCircle2 } from 'lucide-react';
 
 // ★★★ ここにGASのURLを貼り付けてください ★★★
@@ -13,11 +13,13 @@ const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbx5htiLmL8Fk8r45bVm
 const App: React.FC = () => {
   // Logic states
   const [jsonState, setJsonState] = useState<AppState>(AppState.IDLE);
-  const [promptData, setPromptData] = useState<PromptData | null>(null);
+  const [promptData, setPromptData] = useState<DualLanguagePromptData | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   const [poseState, setPoseState] = useState<AppState>(AppState.IDLE);
-  const [poseImages, setPoseImages] = useState<{detailed: string | null, abstract: string | null}>({detailed: null, abstract: null});
+  // Restored: Two pose images
+  const [detailedPose, setDetailedPose] = useState<string | null>(null);
+  const [abstractPose, setAbstractPose] = useState<string | null>(null);
   const [poseError, setPoseError] = useState<string | null>(null);
 
   // Notion state
@@ -104,7 +106,8 @@ const App: React.FC = () => {
 
     // Reset results
     setPromptData(null);
-    setPoseImages({detailed: null, abstract: null});
+    setDetailedPose(null);
+    setAbstractPose(null);
     setJsonError(null);
     setPoseError(null);
     setSaveStatus('idle');
@@ -133,13 +136,14 @@ const App: React.FC = () => {
   const runPoseGeneration = async (image: string, aspectRatio: string, instructions: string, faceImage: string | null) => {
     setPoseState(AppState.ANALYZING);
     try {
-      // Run both generations in parallel
-      const [detailed, abstract] = await Promise.all([
-        generatePoseImage(image, aspectRatio, 'detailed', instructions, faceImage),
-        generatePoseImage(image, aspectRatio, 'abstract', instructions, faceImage)
-      ]);
+      // Run BOTH detailed and abstract generations in parallel
+      const detailedPromise = generatePoseImage(image, aspectRatio, 'detailed', instructions, faceImage);
+      const abstractPromise = generatePoseImage(image, aspectRatio, 'abstract', instructions, faceImage);
 
-      setPoseImages({ detailed, abstract });
+      const [detailedResult, abstractResult] = await Promise.all([detailedPromise, abstractPromise]);
+
+      setDetailedPose(detailedResult);
+      setAbstractPose(abstractResult);
       setPoseState(AppState.REVIEW);
     } catch (err) {
       console.error(err);
@@ -156,10 +160,12 @@ const App: React.FC = () => {
 
     try {
       const payload = {
-        ...promptData,
+        ...promptData.japanese, 
+        english_analysis: promptData.english,
         imageData: uploadedImage,
-        faceRefData: faceRefImage, // Optionally save face ref too
-        userInstructions: userInstructions 
+        faceRefData: faceRefImage,
+        userInstructions: userInstructions,
+        // Optional: you might want to send the generated pose images too if your GAS handles it
       };
 
       const response = await fetch(GAS_API_URL, {
@@ -191,7 +197,8 @@ const App: React.FC = () => {
         setUserInstructions("");
     }
     setPromptData(null);
-    setPoseImages({detailed: null, abstract: null});
+    setDetailedPose(null);
+    setAbstractPose(null);
     setJsonState(AppState.IDLE);
     setPoseState(AppState.IDLE);
     setJsonError(null);
@@ -418,14 +425,13 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* Col 3: Visual Generation (Pose Only) - Split View */}
+            {/* Col 3: Visual Generation (Dual Pose) */}
             <div className="flex flex-col gap-4 h-full min-h-0">
                 <h2 className="text-lg font-semibold text-gray-300 flex items-center gap-2 shrink-0">
                     <span className="w-6 h-6 rounded-full bg-gray-800 text-xs flex items-center justify-center border border-gray-700">3</span>
                     Pose Line Art {faceRefImage && <span className="text-pink-400 ml-1 text-xs font-normal">(Face Swapped)</span>}
                 </h2>
                 
-                {/* Container for Split View */}
                 <div className="flex-1 flex flex-col gap-4 min-h-0">
                     {poseError ? (
                         <div className="bg-red-500/10 border border-red-500/50 text-red-200 p-4 rounded-lg flex items-center gap-3 shrink-0">
@@ -438,24 +444,37 @@ const App: React.FC = () => {
                              <p className="text-gray-400">Generating sketches...</p>
                              {faceRefImage && <p className="text-pink-400 text-xs mt-2">Injecting Face Reference...</p>}
                         </div>
-                    ) : (poseImages.detailed || poseImages.abstract) ? (
+                    ) : detailedPose || abstractPose ? (
                         <>
-                            {/* Top Half: Detailed */}
-                            {poseImages.detailed && (
-                                <PoseDisplay 
-                                    imageUrl={poseImages.detailed} 
-                                    title="Detailed Pose (Likeness)" 
-                                    className="flex-1 min-h-0"
-                                />
-                            )}
-                            {/* Bottom Half: Abstract */}
-                            {poseImages.abstract && (
-                                <PoseDisplay 
-                                    imageUrl={poseImages.abstract} 
-                                    title="Abstract Pose (Structure)" 
-                                    className="flex-1 min-h-0"
-                                />
-                            )}
+                            {/* Detailed Pose (Top Half) */}
+                            <div className="h-1/2 min-h-0 flex flex-col">
+                                {detailedPose ? (
+                                    <PoseDisplay 
+                                        imageUrl={detailedPose} 
+                                        title={faceRefImage ? "Detailed Pose (Likeness)" : "Detailed Pose"} 
+                                        className="h-full"
+                                    />
+                                ) : (
+                                    <div className="h-full flex items-center justify-center bg-gray-900 rounded-xl border border-gray-800">
+                                        <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Abstract Pose (Bottom Half) */}
+                            <div className="h-1/2 min-h-0 flex flex-col">
+                                {abstractPose ? (
+                                    <PoseDisplay 
+                                        imageUrl={abstractPose} 
+                                        title="Abstract Pose (Structure)" 
+                                        className="h-full"
+                                    />
+                                ) : (
+                                    <div className="h-full flex items-center justify-center bg-gray-900 rounded-xl border border-gray-800">
+                                        <Loader2 className="w-6 h-6 animate-spin text-gray-600" />
+                                    </div>
+                                )}
+                            </div>
                         </>
                     ) : (
                          <div className="flex-1 rounded-xl border-2 border-dashed border-gray-800 bg-gray-900/30 flex flex-col items-center justify-center text-center p-8 text-gray-600">

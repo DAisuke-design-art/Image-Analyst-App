@@ -12,6 +12,13 @@ export interface VisualStyle {
   Artistic_Style: string;
 }
 
+export interface EmotionalProfile {
+  Emotion: string;
+  Mood: string;
+  Expression: string;
+  Avoid: string;
+}
+
 export interface FaceFeatures {
   Face_Shape: string;
   Eyes: string;
@@ -19,7 +26,7 @@ export interface FaceFeatures {
   Nose: string;
   Lips: string;
   Makeup: string;
-  Expression: string;
+  Expression: string; // Keeps physical description
 }
 
 export interface HairStyle {
@@ -37,6 +44,7 @@ export interface BodyFeatures {
 export interface Fashion {
   Clothing: string;
   Accessories: string;
+  // Made optional in case AI omits it in one language, though schema requires it
 }
 
 export interface Scene {
@@ -52,19 +60,25 @@ export interface Scene {
 export interface PromptData {
   CORE_IDENTITY: CoreIdentity;
   VISUAL_STYLE: VisualStyle;
+  EMOTIONAL_PROFILE: EmotionalProfile; // New field
   FACE_FEATURES: FaceFeatures;
   HAIR_STYLE: HairStyle;
   BODY_FEATURES: BodyFeatures;
   FASHION: Fashion;
   SCENE: Scene;
-  // QUALITY_SETTINGS removed
-
+  
   fullPrompt: string;
+}
+
+export interface DualLanguagePromptData {
+  japanese: PromptData;
+  english: PromptData;
 }
 
 export interface FaceCoreIdentity {
   Age_Gender: string;
   Ethnicity: string;
+  // ...
 }
 
 export interface ExpressionVibe {
@@ -74,9 +88,10 @@ export interface ExpressionVibe {
 
 export interface FacePromptData {
   CORE_IDENTITY: FaceCoreIdentity;
+  EMOTIONAL_PROFILE: EmotionalProfile; // Replaces simple expression vibe
   FACE_FEATURES: FaceFeatures;
   HAIR_STYLE: HairStyle;
-  EXPRESSION_VIBE: ExpressionVibe;
+  // EXPRESSION_VIBE removed/merged into EMOTIONAL_PROFILE
   fullPrompt: string;
 }
 
