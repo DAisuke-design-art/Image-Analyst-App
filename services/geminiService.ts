@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { PromptData, FacePromptData, DualLanguagePromptData } from "../types";
 
@@ -7,10 +8,12 @@ export const selectApiKey = async (): Promise<void> => {
   }
 };
 
+// Helper to remove data URL prefix
 const stripBase64Header = (base64: string) => {
   return base64.split(',')[1] || base64;
 };
 
+// Helper to extract mime type from data URL
 const getMimeType = (base64: string) => {
   const match = base64.match(/^data:(.*);base64,/);
   return match ? match[1] : 'image/jpeg';
@@ -118,19 +121,18 @@ const singleLanguagePromptSchema: Schema = {
     fullPrompt: { type: Type.STRING, description: "A descriptive narrative paragraph of the image." }
   },
   required: [
-    "CORE_IDENTITY", "VISUAL_STYLE", "EMOTIONAL_PROFILE", "FACE_FEATURES", "HAIR_STYLE",
+    "CORE_IDENTITY", "VISUAL_STYLE", "EMOTIONAL_PROFILE", "FACE_FEATURES", "HAIR_STYLE", 
     "BODY_FEATURES", "FASHION", "SCENE", "fullPrompt"
   ]
 };
 
+/**
+ * Analyzes an image to generate a structured JSON prompt in both Japanese and English.
+ * Uses gemini-2.5-flash for speed and vision capabilities.
+ */
 export const analyzeImageToJSON = async (base64Image: string, instructions: string = ""): Promise<DualLanguagePromptData> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key not found. Please set VITE_GEMINI_API_KEY in .env");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -153,6 +155,7 @@ export const analyzeImageToJSON = async (base64Image: string, instructions: stri
     **IMPORTANT: USER OVERRIDES**
     The user has provided the following specific instructions/modifications:
     "${instructions}"
+    *Ensure these instructions are reflected in the analysis (e.g., if user says 'make hair red', describe the hair as red).*
 
     **GUIDELINE 1: SUBJECT AESTHETICS (THE "BEAUTY FILTER")**
     - **Target**: The person/character in the image.
@@ -167,35 +170,35 @@ export const analyzeImageToJSON = async (base64Image: string, instructions: stri
     **GUIDELINE 3: EMOTIONAL DEPTH (EMOTIONAL_PROFILE)**
     Analyze the nuance of the expression and mood. Use the following references as a guide for the "EMOTIONAL_PROFILE" fields:
 
-    * **Playful / Innocent (無邪気・楽しい)**
-        * Emotion: Playful - "So fun! Want to share!"
-        * Mood: Genuinely happy, carefree, childlike joy
-        * Expression: Bright sparkling eyes, sweet playful smile
-        * Avoid: Fake smile, serious expression
+    *   **Playful / Innocent (無邪気・楽しい)**
+        *   Emotion: Playful - "So fun! Want to share!"
+        *   Mood: Genuinely happy, carefree, childlike joy
+        *   Expression: Bright sparkling eyes, sweet playful smile
+        *   Avoid: Fake smile, serious expression
 
-    * **Seeking Attention / Cute (甘え・構ってほしい)**
-        * Emotion: Seeking attention - "Pay attention to me"
-        * Mood: Wanting validation, a bit shy but showing off
-        * Expression: Soft pleading eyes, cute pouty lips
-        * Avoid: Overly confident, cold expressions
+    *   **Seeking Attention / Cute (甘え・構ってほしい)**
+        *   Emotion: Seeking attention - "Pay attention to me"
+        *   Mood: Wanting validation, a bit shy but showing off
+        *   Expression: Soft pleading eyes, cute pouty lips
+        *   Avoid: Overly confident, cold expressions
 
-    * **Confident / Self-assured (自信・見てほしい)**
-        * Emotion: Confident - "Don't I look cute?"
-        * Mood: Satisfied with today's look, self-assured
-        * Expression: Confident smile, relaxed posture
-        * Avoid: Insecure, anxious expressions
+    *   **Confident / Self-assured (自信・見てほしい)**
+        *   Emotion: Confident - "Don't I look cute?"
+        *   Mood: Satisfied with today's look, self-assured
+        *   Expression: Confident smile, relaxed posture
+        *   Avoid: Insecure, anxious expressions
 
-    * **Vulnerable / Fragile (儚さ・守りたくなる)**
-        * Emotion: Vulnerable - "Feeling a bit lonely..."
-        * Mood: Slightly melancholy, fragile beauty
-        * Expression: Soft downcast eyes, delicate expression
-        * Avoid: Energetic, strong, confident looks
+    *   **Vulnerable / Fragile (儚さ・守りたくなる)**
+        *   Emotion: Vulnerable - "Feeling a bit lonely..."
+        *   Mood: Slightly melancholy, fragile beauty
+        *   Expression: Soft downcast eyes, delicate expression
+        *   Avoid: Energetic, strong, confident looks
 
-    * **Intimate / Secret (秘密・特別感)**
-        * Emotion: Intimate - "This is just for you"
-        * Mood: Sharing a secret, special closeness
-        * Expression: Soft shy smile, slightly blushing
-        * Avoid: Public-facing smile, distant expression
+    *   **Intimate / Secret (秘密・特別感)**
+        *   Emotion: Intimate - "This is just for you"
+        *   Mood: Sharing a secret, special closeness
+        *   Expression: Soft shy smile, slightly blushing
+        *   Avoid: Public-facing smile, distant expression
 
     **INSTRUCTION PRIORITY:**
     1. User instructions (highest).
@@ -221,7 +224,7 @@ export const analyzeImageToJSON = async (base64Image: string, instructions: stri
   `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: {
       parts: [
         imagePart,
@@ -236,76 +239,16 @@ export const analyzeImageToJSON = async (base64Image: string, instructions: stri
 
   const text = response.text;
   if (!text) throw new Error("No response from model");
-
+  
   return JSON.parse(text) as DualLanguagePromptData;
-};
-
-export const generatePoseImage = async (base64Image: string, aspectRatio: string = "1:1", style: 'detailed' | 'abstract' = 'detailed', instructions: string = "", faceImage?: string | null): Promise<string> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY;
-  if (!apiKey) throw new Error("API Key not found. Please set VITE_GEMINI_API_KEY in .env");
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  const imagePart = {
-    inlineData: {
-      mimeType: getMimeType(base64Image),
-      data: stripBase64Header(base64Image),
-    },
-  };
-
-  const parts: any[] = [];
-
-  if (style === 'detailed') {
-    if (faceImage) {
-      const faceImagePart = {
-        inlineData: {
-          mimeType: getMimeType(faceImage),
-          data: stripBase64Header(faceImage),
-        },
-      };
-
-      parts.push(imagePart);
-      parts.push({ text: "SOURCE 1 [POSE REFERENCE]: EXTRACT BODY, POSE, CLOTHING, ANGLE." });
-      parts.push(faceImagePart);
-      parts.push({ text: "SOURCE 2 [IDENTITY REFERENCE]: EXTRACT FACE, EYES, MOUTH." });
-      parts.push({ text: `Create a new LINE ART image combining Source 1's body with Source 2's head/face. ${instructions}` });
-    } else {
-      parts.push(imagePart);
-      parts.push({ text: `Create a detailed LINE ART drawing of this person. ${instructions}` });
-    }
-  } else {
-    parts.push(imagePart);
-    parts.push({ text: `Create a structural MANNEQUIN-STYLE line drawing of the pose. No details. ${instructions}` });
-  }
-
-  // Use Experimental model which may support image output
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash-exp',
-    contents: { parts: parts },
-  });
-
-  if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-  }
-
-  // If no image, maybe it refused?
-  console.warn("Model response text:", response.text);
-  throw new Error("Model generated text instead of image. (Gemini 2.0 Flash may not support image generation natively in this region/key).");
 };
 
 /**
  * Analyzes the face in the image to generate a structured JSON prompt specifically for Frontal Face generation.
  */
 export const analyzeFaceToJSON = async (base64Image: string): Promise<FacePromptData> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY;
-  if (!apiKey) throw new Error("API Key not found. Please set VITE_GEMINI_API_KEY in .env");
-
-  const ai = new GoogleGenAI({ apiKey });
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -333,7 +276,11 @@ export const analyzeFaceToJSON = async (base64Image: string): Promise<FacePrompt
   };
 
   const promptText = `
-    Analyze this image and extract detailed Face features.
+    Analyze the FACE in this image and create a structured JSON for generating a **High-Quality Frontal Portrait**.
+    
+    Output ALL string values in **JAPANESE**.
+    
+    Even if the image is side-view, describe the features as they would appear in a Frontal View (Passport style / ID photo style but artistic).
 
     Focus intensely on:
     1. **EMOTIONAL_PROFILE**: Decode the subtle emotion. Is it "Playful", "Confident", "Vulnerable", or "Intimate"? Define the Mood and what to Avoid.
@@ -345,7 +292,7 @@ export const analyzeFaceToJSON = async (base64Image: string): Promise<FacePrompt
   `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash', // Keeping consistent model
+    model: 'gemini-2.5-flash',
     contents: {
       parts: [
         imagePart,
@@ -360,15 +307,143 @@ export const analyzeFaceToJSON = async (base64Image: string): Promise<FacePrompt
 
   const text = response.text;
   if (!text) throw new Error("No response from model");
-
+  
   return JSON.parse(text) as FacePromptData;
 };
 
-export const generateFrontalFaceImage = async (base64Image: string): Promise<string> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY;
-  if (!apiKey) throw new Error("API Key not found. Please set VITE_GEMINI_API_KEY in .env");
+/**
+ * Generates a simple line art drawing of the pose from the input image.
+ * Uses gemini-2.5-flash-image for image-to-image generation.
+ */
+export const generatePoseImage = async (base64Image: string, aspectRatio: string = "1:1", style: 'detailed' | 'abstract' = 'detailed', instructions: string = "", faceImage?: string | null): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const ai = new GoogleGenAI({ apiKey });
+  // Main pose image part (Source 1)
+  const poseImagePart = {
+    inlineData: {
+      mimeType: getMimeType(base64Image),
+      data: stripBase64Header(base64Image),
+    },
+  };
+
+  const parts: any[] = [];
+  
+  // Logic for Detailed (Likeness) vs Abstract (Structure)
+  if (style === 'detailed') {
+    // --- DETAILED MODE: Face Swap & High Likeness ---
+    if (faceImage) {
+      // Face reference part (Source 2)
+      const faceImagePart = {
+        inlineData: {
+          mimeType: getMimeType(faceImage),
+          data: stripBase64Header(faceImage),
+        },
+      };
+      
+      // Order of operations for the Model: Image 1 (Pose) -> Image 2 (Face) -> Instructions
+      parts.push(poseImagePart);
+      parts.push(faceImagePart);
+      
+      const detailedPrompt = `
+      **TASK: NEUTRAL LINE ART (FACE SWAP)**
+      
+      **INPUTS (In order):**
+      1. **FIRST IMAGE (POSE Source)**: Use the body, pose, gesture, clothing, composition, and angle from this image.
+      2. **SECOND IMAGE (FACE Source)**: Use the facial identity, eyes, nose, mouth, and hairstyle from this image.
+      
+      **USER INSTRUCTIONS (HIGHEST PRIORITY):**
+      "${instructions}"
+      (IMPORTANT: If the user asks for a specific hair color, expression, or accessory, apply it EVEN IF it contradicts the source images.)
+
+      **EXECUTION GUIDE:**
+      - **BASE**: Draw the subject from Image 1.
+      - **SWAP**: REPLACE the head/face of Image 1 with the head/face of Image 2.
+      - **ADJUST**: Rotate the face from Image 2 to match the neck angle of Image 1.
+      
+      **STYLE GUIDELINES:**
+      - **Style**: Clean, Neutral Line Art. **Do NOT use Anime/Manga style.**
+      - **Concept**: A simple but descriptive drawing, slightly more detailed than a structural mannequin.
+      - **Detail Level**: 
+         - **Body/Clothes**: Clearly trace the outlines and main folds of the clothing.
+         - **Face**: Draw the eyes, nose, and mouth clearly to show the expression.
+      - **Visuals**: Black lines, White background. No shading. No filling.
+      `;
+      parts.push({ text: detailedPrompt });
+
+    } else {
+      // Single Image Detailed Mode
+      parts.push(poseImagePart);
+      
+      const detailedPrompt = `
+      **TASK: NEUTRAL LINE ART**
+      
+      **INPUT:**
+      - Use the provided image as the reference for Pose, Identity, and Composition.
+      
+      **USER INSTRUCTIONS (HIGHEST PRIORITY):**
+      "${instructions}"
+      (IMPORTANT: Modify the result based on these instructions. e.g., "Change hair to short", "Add glasses".)
+
+      **STYLE GUIDELINES:**
+      - **Style**: Clean, Neutral Line Art. **Do NOT use Anime/Manga style.**
+      - **Concept**: A simple but descriptive drawing, slightly more detailed than a structural mannequin.
+      - **Detail Level**: 
+         - **Body/Clothes**: Clearly trace the outlines and main folds of the clothing.
+         - **Face**: Draw the eyes, nose, and mouth clearly to show the expression.
+      - **Visuals**: Black lines, White background. No shading. No filling.
+      `;
+      parts.push({ text: detailedPrompt });
+    }
+
+  } else {
+    // --- ABSTRACT MODE: Structure / Mannequin ---
+    // In abstract mode, we generally focus on the Pose Source structure.
+    parts.push(poseImagePart);
+
+    const abstractPrompt = `
+      Create a structural 'mannequin-style' line drawing of the subject in this image.
+
+      **USER INSTRUCTION OVERRIDE:** "${instructions}"
+
+      STYLE GUIDELINES (ABSTRACT / STRUCTURE):
+      - **NO SHADING**. Pure line art.
+      - **SIMPLIFIED FACE**: Do NOT draw detailed realistic features. Draw a "drawing doll" or "mannequin" face.
+      - **ESSENTIALS ONLY**: 
+        - Draw the **Eye Line** and **Center Line** of the face to show head direction.
+        - Draw clear outlines of the body and limbs.
+        - Simplify clothing into major shapes.
+      - **GOAL**: This image is for AI Pose Estimation (ControlNet). Clean geometry is more important than beauty.
+      
+      If the user requested a specific hairstyle (e.g. "Short hair"), represent the *volume* of that hair simply.
+    `;
+    parts.push({ text: abstractPrompt });
+  }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: {
+      parts: parts
+    },
+    config: {
+      imageConfig: {
+        aspectRatio: aspectRatio as any
+      }
+    }
+  });
+
+  if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+  }
+
+  throw new Error("No image was generated by the model.");
+};
+
+export const generateFrontalFaceImage = async (base64Image: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const imagePart = {
     inlineData: {
@@ -383,13 +458,13 @@ export const generateFrontalFaceImage = async (base64Image: string): Promise<str
     TRANSFORMATION REQUIRED:
     - Re-imagine the subject's face as if they are looking STRAIGHT at the camera (Front View).
     - Even if the original image is from the side, **ROTATE the face to be a perfect front view**.
-
+    
     STYLE GUIDELINES:
     - Black lines on a pure white background.
     - Minimalist, clean sketch style.
     - Thick, confident lines.
     - High contrast (Black & White only).
-
+    
     CONTENT REQUIREMENTS:
     - **CLOSE-UP**: Crop to focus strictly on the head, hair, and neck.
     - **FRONTAL VIEW**: The eyes must look straight ahead. The face must be symmetrical.
@@ -397,9 +472,8 @@ export const generateFrontalFaceImage = async (base64Image: string): Promise<str
     - No background.
   `;
 
-  // Use Experimental for image generation chance
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash-exp',
+    model: 'gemini-2.5-flash-image',
     contents: {
       parts: [
         imagePart,
@@ -407,7 +481,9 @@ export const generateFrontalFaceImage = async (base64Image: string): Promise<str
       ]
     },
     config: {
-      // imageConfig not supported in flash-exp typically unless specialized, but passing standard config
+      imageConfig: {
+        aspectRatio: "1:1" // Always square for portraits
+      }
     }
   });
 

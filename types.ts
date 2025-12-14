@@ -1,3 +1,4 @@
+
 export interface CoreIdentity {
   Age_Gender: string;
   Beauty_Characteristics: string;
@@ -32,7 +33,6 @@ export interface HairStyle {
   Color: string;
   Style: string;
   Bangs: string;
-  // Made optional in case AI omits it in one language, though schema requires it
 }
 
 export interface BodyFeatures {
@@ -44,6 +44,7 @@ export interface BodyFeatures {
 export interface Fashion {
   Clothing: string;
   Accessories: string;
+  // Made optional in case AI omits it in one language, though schema requires it
 }
 
 export interface Scene {
@@ -54,6 +55,8 @@ export interface Scene {
   Aspect_Ratio: string;
 }
 
+// QualitySettings removed
+
 export interface PromptData {
   CORE_IDENTITY: CoreIdentity;
   VISUAL_STYLE: VisualStyle;
@@ -63,6 +66,7 @@ export interface PromptData {
   BODY_FEATURES: BodyFeatures;
   FASHION: Fashion;
   SCENE: Scene;
+  
   fullPrompt: string;
 }
 
@@ -75,6 +79,11 @@ export interface FaceCoreIdentity {
   Age_Gender: string;
   Ethnicity: string;
   // ...
+}
+
+export interface ExpressionVibe {
+  Mood: string;
+  Gaze: string;
 }
 
 export interface FacePromptData {
