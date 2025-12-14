@@ -45,6 +45,27 @@ const App: React.FC = () => {
   const handleImageSelect = (base64: string) => setUploadedImage(base64);
   const handleFaceRefSelect = (base64: string) => setFaceRefImage(base64);
 
+  const parseError = (err: any): string => {
+    let message = err.message || "An error occurred";
+    try {
+      // Try to parse if the message is a JSON string (as seen in Gemini 429 errors)
+      const parsed = JSON.parse(message.replace(/^[^{]*({.*})[^}]*$/, '$1')); // Attempt to extract JSON if surrounded by text
+      if (parsed.error && parsed.error.message) {
+        message = parsed.error.message;
+      } else if (parsed.message) {
+        message = parsed.message;
+      }
+    } catch (e) {
+      // Not JSON, use original message
+    }
+
+    // Friendly mapping for common errors
+    if (message.includes("429") || message.includes("RESOURCE_EXHAUSTED")) {
+      return "⚠️ Usage Limit Exceeded (429). Please wait a minute and try again.";
+    }
+    return message;
+  };
+
   const handleExecute = async () => {
     if (!uploadedImage) return;
     setPromptData(null);
@@ -66,7 +87,7 @@ const App: React.FC = () => {
       setJsonState(AppState.REVIEW);
     } catch (err: any) {
       console.error(err);
-      setJsonError(err.message || "Failed to analyze image.");
+      setJsonError(parseError(err));
       setJsonState(AppState.IDLE);
     }
   };
@@ -82,7 +103,7 @@ const App: React.FC = () => {
       setPoseState(AppState.REVIEW);
     } catch (err: any) {
       console.error(err);
-      setPoseError(err.message || "Failed to generate pose.");
+      setPoseError(parseError(err));
       setPoseState(AppState.IDLE);
     }
   };
@@ -129,10 +150,10 @@ const App: React.FC = () => {
       } else {
         throw new Error(result.message || 'Unknown error');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Notion Save Error:", error);
       setSaveStatus('error');
-      alert("保存エラー: " + error);
+      alert("保存エラー: " + parseError(error));
     } finally {
       setIsSaving(false);
     }

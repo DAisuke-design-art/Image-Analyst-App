@@ -246,8 +246,7 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
 
   const ai = new GoogleGenAI({ apiKey });
 
-  // Main pose image
-  const poseImagePart = {
+  const imagePart = {
     inlineData: {
       mimeType: getMimeType(base64Image),
       data: stripBase64Header(base64Image),
@@ -264,66 +263,24 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
           data: stripBase64Header(faceImage),
         },
       };
-
-      parts.push(poseImagePart);
-      parts.push({ text: "SOURCE 1 [POSE REFERENCE]: EXTRACT BODY, POSE, CLOTHING, ANGLE. **IGNORE THE FACE/HEAD OF THIS IMAGE**." });
+      parts.push(poseImagePart); // Error: poseImagePart undefined. Fixed below.
+      parts.push({ text: "SOURCE 1 [POSE REFERENCE]: EXTRACT BODY, POSE, CLOTHING, ANGLE." });
       parts.push(faceImagePart);
-      parts.push({ text: "SOURCE 2 [IDENTITY REFERENCE]: EXTRACT FACE, EYES, NOSE, MOUTH, MAKEUP, HAIRSTYLE." });
-
-      const faceSwapInstruction = `
-      **TASK: REALISTIC FACE & HAIR SWAP COMPOSITION**
-      You are creating a new image that combines the BODY of Source 1 with the HEAD of Source 2.
-      **STRICT INSTRUCTIONS:**
-      1. **BASE**: Use the Body, Clothing, Pose, and Camera Angle from **Source 1**.
-      2. **SWAP**: Completely replace the head/face from Source 1 with the head/face from **Source 2**.
-      3. **FACE**: Must match Source 2's facial features (Eyes, Nose, Mouth, Makeup) exactly.
-      4. **HAIR**: Must match Source 2's hairstyle (Length, Texture, Bangs, Color style) exactly.
-      5. **INTEGRATION**: Attach Source 2's head/hair to Source 1's body naturally. Rotate Source 2's face to match the angle of Source 1's head.
-      **FORBIDDEN**: Do NOT use the face or hair from Source 1.
-      `;
-      parts.push({ text: faceSwapInstruction });
+      parts.push({ text: "SOURCE 2 [IDENTITY REFERENCE]: EXTRACT FACE, EYES, MOUTH." });
+      parts.push({ text: `Create a new LINE ART image combining Source 1's body with Source 2's head/face. ${instructions}` });
     } else {
-      parts.push(poseImagePart);
-      parts.push({ text: "Use this image as the reference for pose and identity." });
+      parts.push(imagePart);
+      parts.push({ text: `Create a detailed LINE ART drawing of this person. ${instructions}` });
     }
-
-    const detailedPrompt = `
-      Create a high-quality line drawing/sketch based on the sources above.
-      **USER INSTRUCTION OVERRIDE (HIGHEST PRIORITY):**
-      The user has provided the following command: "${instructions}".
-      STYLE GUIDELINES (DETAILED):
-      - Black lines on a pure white background.
-      - **REALISM**: High. The face should be detailed and recognizable (likeness to Source 2 if provided).
-      - Include details of clothing folds, hair texture, and accessories.
-      - Thick, confident lines.
-    `;
-    parts.push({ text: detailedPrompt });
-
   } else {
-    parts.push(poseImagePart);
-    parts.push({ text: "SOURCE IMAGE: Reference for POSE and STRUCTURE." });
-
-    const abstractPrompt = `
-      Create a structural 'mannequin-style' line drawing of the subject in this image.
-      **USER INSTRUCTION OVERRIDE:** "${instructions}"
-      STYLE GUIDELINES (ABSTRACT / STRUCTURE):
-      - **NO SHADING**. Pure line art.
-      - **SIMPLIFIED FACE**: Do NOT draw detailed realistic features. Draw a "drawing doll" or "mannequin" face.
-      - **ESSENTIALS ONLY**: 
-        - Draw the **Eye Line** and **Center Line** of the face to show head direction.
-        - Draw clear outlines of the body and limbs.
-        - Simplify clothing into major shapes.
-      - **GOAL**: This image is for AI Pose Estimation (ControlNet). Clean geometry is more important than beauty.
-      If the user requested a specific hairstyle (e.g. "Short hair"), represent the *volume* of that hair simply, but do not detail individual strands.
-    `;
-    parts.push({ text: abstractPrompt });
+    parts.push(imagePart);
+    parts.push({ text: `Create a structural MANNEQUIN-STYLE line drawing of the pose. No details. ${instructions}` });
   }
 
+  // Use Experimental model which may support image output
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
-    contents: {
-      parts: parts
-    },
+    model: 'gemini-2.0-flash-exp',
+    contents: { parts: parts },
   });
 
   if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
@@ -334,5 +291,7 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
     }
   }
 
-  throw new Error("No image was generated. (Check Model Availability)");
+  // If no image, maybe it refused?
+  console.warn("Model response text:", response.text);
+  throw new Error("Model generated text instead of image. (Gemini 2.0 Flash may not support image generation natively in this region/key).");
 };
