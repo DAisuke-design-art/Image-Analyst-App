@@ -263,7 +263,8 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
           data: stripBase64Header(faceImage),
         },
       };
-      parts.push(poseImagePart); // Error: poseImagePart undefined. Fixed below.
+
+      parts.push(imagePart);
       parts.push({ text: "SOURCE 1 [POSE REFERENCE]: EXTRACT BODY, POSE, CLOTHING, ANGLE." });
       parts.push(faceImagePart);
       parts.push({ text: "SOURCE 2 [IDENTITY REFERENCE]: EXTRACT FACE, EYES, MOUTH." });
@@ -294,4 +295,129 @@ export const generatePoseImage = async (base64Image: string, aspectRatio: string
   // If no image, maybe it refused?
   console.warn("Model response text:", response.text);
   throw new Error("Model generated text instead of image. (Gemini 2.0 Flash may not support image generation natively in this region/key).");
+};
+
+/**
+ * Analyzes the face in the image to generate a structured JSON prompt specifically for Frontal Face generation.
+ */
+export const analyzeFaceToJSON = async (base64Image: string): Promise<FacePromptData> => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY;
+  if (!apiKey) throw new Error("API Key not found. Please set VITE_GEMINI_API_KEY in .env");
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      CORE_IDENTITY: {
+        type: Type.OBJECT,
+        properties: {
+          Age_Gender: { type: Type.STRING },
+          Ethnicity: { type: Type.STRING },
+        },
+        required: ["Age_Gender", "Ethnicity"]
+      },
+      EMOTIONAL_PROFILE: emotionalProfileSchema, // Now using the shared emotional schema
+      FACE_FEATURES: faceFeaturesSchema,
+      HAIR_STYLE: hairStyleSchema,
+      fullPrompt: { type: Type.STRING, description: "A highly detailed narrative description of the face for a frontal portrait." }
+    },
+    required: ["CORE_IDENTITY", "EMOTIONAL_PROFILE", "FACE_FEATURES", "HAIR_STYLE", "fullPrompt"]
+  };
+
+  const imagePart = {
+    inlineData: {
+      mimeType: getMimeType(base64Image),
+      data: stripBase64Header(base64Image),
+    },
+  };
+
+  const promptText = `
+    Analyze this image and extract detailed Face features.
+
+    Focus intensely on:
+    1. **EMOTIONAL_PROFILE**: Decode the subtle emotion. Is it "Playful", "Confident", "Vulnerable", or "Intimate"? Define the Mood and what to Avoid.
+    2. **FACE_FEATURES**: Precise shape of eyes, nose, lips.
+    3. **HAIR_STYLE**: Exact hair texture, color, and framing of the face.
+    4. **EXPRESSION**: Describe the gaze as looking straight at the viewer.
+
+    Finally, generate 'fullPrompt': A detailed paragraph describing JUST the face and hair for a portrait generation.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash', // Keeping consistent model
+    contents: {
+      parts: [
+        imagePart,
+        { text: promptText }
+      ]
+    },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: responseSchema,
+    },
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("No response from model");
+
+  return JSON.parse(text) as FacePromptData;
+};
+
+export const generateFrontalFaceImage = async (base64Image: string): Promise<string> => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY;
+  if (!apiKey) throw new Error("API Key not found. Please set VITE_GEMINI_API_KEY in .env");
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const imagePart = {
+    inlineData: {
+      mimeType: getMimeType(base64Image),
+      data: stripBase64Header(base64Image),
+    },
+  };
+
+  const promptText = `
+    Create a Close-up Frontal Face Line Art from this image.
+
+    TRANSFORMATION REQUIRED:
+    - Re-imagine the subject's face as if they are looking STRAIGHT at the camera (Front View).
+    - Even if the original image is from the side, **ROTATE the face to be a perfect front view**.
+
+    STYLE GUIDELINES:
+    - Black lines on a pure white background.
+    - Minimalist, clean sketch style.
+    - Thick, confident lines.
+    - High contrast (Black & White only).
+
+    CONTENT REQUIREMENTS:
+    - **CLOSE-UP**: Crop to focus strictly on the head, hair, and neck.
+    - **FRONTAL VIEW**: The eyes must look straight ahead. The face must be symmetrical.
+    - **DETAILS**: Capture the specific hairstyle, eye shape, and facial features of the subject.
+    - No background.
+  `;
+
+  // Use Experimental for image generation chance
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash-exp',
+    contents: {
+      parts: [
+        imagePart,
+        { text: promptText }
+      ]
+    },
+    config: {
+      // imageConfig not supported in flash-exp typically unless specialized, but passing standard config
+    }
+  });
+
+  if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+  }
+
+  throw new Error("No face image was generated by the model.");
 };

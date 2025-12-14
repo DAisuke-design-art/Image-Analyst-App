@@ -25,13 +25,14 @@ export interface FaceFeatures {
   Nose: string;
   Lips: string;
   Makeup: string;
-  Expression: string;
+  Expression: string; // Keeps physical description
 }
 
 export interface HairStyle {
   Color: string;
   Style: string;
   Bangs: string;
+  // Made optional in case AI omits it in one language, though schema requires it
 }
 
 export interface BodyFeatures {
@@ -56,7 +57,7 @@ export interface Scene {
 export interface PromptData {
   CORE_IDENTITY: CoreIdentity;
   VISUAL_STYLE: VisualStyle;
-  EMOTIONAL_PROFILE: EmotionalProfile;
+  EMOTIONAL_PROFILE: EmotionalProfile; // New field
   FACE_FEATURES: FaceFeatures;
   HAIR_STYLE: HairStyle;
   BODY_FEATURES: BodyFeatures;
@@ -73,13 +74,15 @@ export interface DualLanguagePromptData {
 export interface FaceCoreIdentity {
   Age_Gender: string;
   Ethnicity: string;
+  // ...
 }
 
 export interface FacePromptData {
   CORE_IDENTITY: FaceCoreIdentity;
-  EMOTIONAL_PROFILE: EmotionalProfile;
+  EMOTIONAL_PROFILE: EmotionalProfile; // Replaces simple expression vibe
   FACE_FEATURES: FaceFeatures;
   HAIR_STYLE: HairStyle;
+  // EXPRESSION_VIBE removed/merged into EMOTIONAL_PROFILE
   fullPrompt: string;
 }
 

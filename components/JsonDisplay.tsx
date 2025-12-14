@@ -29,8 +29,8 @@ const JsonDisplay: React.FC<JsonDisplayProps> = ({ data }) => {
     <button
       onClick={() => setActiveLang(lang)}
       className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${activeLang === lang
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-          : 'text-gray-400 hover:text-white hover:bg-gray-800'
+        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+        : 'text-gray-400 hover:text-white hover:bg-gray-800'
         }`}
     >
       {label}
