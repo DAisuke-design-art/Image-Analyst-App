@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { analyzeImageToJSON, generatePoseImage } from './services/geminiService';
 import ImageUploader from './components/ImageUploader';
@@ -9,6 +8,8 @@ import { Loader2, X, Code2, ImageIcon, FileJson, Save, CheckCircle, Wand2, Messa
 
 // ★★★ ここにGASのURLを貼り付けてください ★★★
 const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbx5htiLmL8Fk8r45bVm9byWl-EmYo7mshJkj-wijdpo2E63RrVXn3dXu2DfEuGlrqOX/exec';
+// ★★★ GASコードと一致させた合言葉 ★★★
+const AUTH_KEY = 'MySecretPass123';
 
 const App: React.FC = () => {
   // Logic states
@@ -159,17 +160,39 @@ const App: React.FC = () => {
     setSaveStatus('idle');
 
     try {
+      // GAS側で base64Decode するため、データURLのヘッダー(data:image/png;base64,)を削除するヘルパー
+      const stripBase64Header = (base64: string | null) => {
+        if (!base64) return "";
+        return base64.split(',')[1] || base64;
+      };
+
       const payload = {
-        ...promptData.japanese, 
-        english_analysis: promptData.english,
-        imageData: uploadedImage,
-        faceRefData: faceRefImage,
+        // 1. 認証キー
+        authKey: AUTH_KEY,
+
+        // 2. Notionプロパティ用
+        subject: promptData.japanese.CORE_IDENTITY.Age_Gender || "Analysis Result",
+        category: promptData.japanese.VISUAL_STYLE.Archetype || "Uncategorized",
+        keywords: [
+            promptData.japanese.VISUAL_STYLE.Vibe, 
+            promptData.japanese.EMOTIONAL_PROFILE.Mood
+        ].join(","),
+        details: JSON.stringify(promptData.japanese, null, 2),
+        fullPrompt: promptData.japanese.fullPrompt,
+
+        // 3. 画像データ（3種類すべて送る）
+        imageData: stripBase64Header(uploadedImage),        // 元画像
+        detailedPoseData: stripBase64Header(detailedPose),  // ポーズ（詳細）
+        abstractPoseData: stripBase64Header(abstractPose),  // ポーズ（抽象）
+        
         userInstructions: userInstructions,
-        // Optional: you might want to send the generated pose images too if your GAS handles it
       };
 
       const response = await fetch(GAS_API_URL, {
         method: 'POST',
+        headers: {
+          "Content-Type": "text/plain", 
+        },
         body: JSON.stringify(payload),
       });
 
